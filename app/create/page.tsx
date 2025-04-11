@@ -146,6 +146,10 @@ Imagine - John Lennon"
           <code className="bg-muted p-1 rounded">Song Title - Artist Name</code> or{" "}
           <code className="bg-muted p-1 rounded">Artist Name - Song Title</code>
         </p>
+        <p className="mt-4 text-xs">
+          You can also upload images of playlists, screenshots, or photos of physical media.
+          <br />Our OCR technology will extract the track information automatically.
+        </p>
       </div>
     </div>
   )
