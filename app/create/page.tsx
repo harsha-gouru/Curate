@@ -134,7 +134,68 @@ Imagine - John Lennon"
             </TabsContent>
 
             <TabsContent value="upload">
-              <FileUpload onFileContent={setTrackList} />
+              <div className="space-y-6">
+                <FileUpload onFileContent={(content) => {
+                  console.log('File content received:', content.length);
+                  
+                  // Set the track list in state
+                  setTrackList(content);
+                  
+                  // If we have content, process it directly (don't use synthetic event)
+                  if (content.trim()) {
+                    setIsLoading(true);
+                    
+                    // Process the track list exactly like handleSubmit does
+                    let processedTrackList = content;
+                    
+                    // Split into lines and process each line
+                    const lines = processedTrackList.split('\n');
+                    const processedLines = lines.map(line => {
+                      let processedLine = line.trim();
+                      
+                      // Skip empty lines
+                      if (!processedLine) return '';
+                      
+                      // Handle tab-separated format (most common from spreadsheets)
+                      if (processedLine.includes('\t')) {
+                        // Replace multiple consecutive tabs with a single dash
+                        processedLine = processedLine.replace(/\s*\t+\s*/g, ' - ');
+                      }
+                      
+                      // Handle formats where the separator might not be a dash
+                      if (!processedLine.includes('-')) {
+                        // Multiple spaces (2+) are likely separators
+                        if (/\s{2,}/.test(processedLine)) {
+                          processedLine = processedLine.replace(/\s{2,}/g, ' - ');
+                        }
+                        // Commas likely separate artist and track 
+                        else if (processedLine.includes(',')) {
+                          processedLine = processedLine.replace(/\s*,\s*/, ' - ');
+                        }
+                        // Separators like " by ", " from ", etc.
+                        else if (/\sby\s/i.test(processedLine)) {
+                          processedLine = processedLine.replace(/\s+by\s+/i, ' - ');
+                        }
+                      }
+                      
+                      return processedLine;
+                    });
+                    
+                    // Rejoin the processed lines
+                    processedTrackList = processedLines.filter(Boolean).join('\n');
+                    
+                    // Store the processed track list in localStorage
+                    console.log('Storing processed track list:', processedTrackList);
+                    localStorage.setItem("trackList", processedTrackList);
+                    
+                    // Redirect to review page after a brief delay
+                    setTimeout(() => {
+                      router.push("/review");
+                      setIsLoading(false);
+                    }, 1000);
+                  }
+                }} />
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>

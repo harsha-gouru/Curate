@@ -25,6 +25,7 @@ export default function ReviewMatchesPage() {
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(false)
   const [showSetupInstructions, setShowSetupInstructions] = useState(false)
   const [tracksPerSearch, setTracksPerSearch] = useState<number>(5)
+  const [searchMode, setSearchMode] = useState<'exact' | 'similar'>('exact')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -42,9 +43,13 @@ export default function ReviewMatchesPage() {
 
     // Get the track list from localStorage
     const trackList = localStorage.getItem("trackList") || ""
+    console.log("Track list from localStorage:", trackList)
+    
     const trackLines = trackList.split("\n").filter((line) => line.trim())
+    console.log("Parsed track lines:", trackLines)
 
     if (trackLines.length === 0) {
+      console.log("No tracks found in localStorage")
       setIsLoading(false)
       return
     }
@@ -59,6 +64,7 @@ export default function ReviewMatchesPage() {
 
   const searchForTracks = async (trackLines: string[]) => {
     setIsLoading(true)
+    console.log(`Starting search for tracks with lines (mode: ${searchMode}):`, trackLines)
 
     try {
       // Search for tracks one by one
@@ -69,21 +75,43 @@ export default function ReviewMatchesPage() {
           // Process the line to handle different formats
           let processedLine = line.trim()
           
+          // Skip empty lines
+          if (!processedLine) continue
+          
+          console.log("Searching for track:", processedLine)
+          
           // If line contains tabs, convert to a dash format
           if (processedLine.includes('\t')) {
             processedLine = processedLine.replace(/\s*\t+\s*/g, ' - ')
           }
           
-          const trackResults = await searchTracks(processedLine, tracksPerSearch)
+          // Pass the search mode to the API
+          const trackResults = await searchTracks(processedLine, tracksPerSearch, searchMode === 'exact')
+          console.log(`Found ${trackResults.length} results for "${processedLine}"`)
+          
           if (trackResults.length > 0) {
-            results.push(...trackResults)
+            // If in exact mode, only take the first result
+            if (searchMode === 'exact') {
+              results.push(trackResults[0])
+            } else {
+              results.push(...trackResults)
+            }
           }
         } catch (error) {
           console.error(`Error searching for "${line}":`, error)
         }
       }
 
+      console.log(`Found ${results.length} total tracks from ${trackLines.length} search terms`)
       setTracks(results)
+      
+      if (results.length === 0) {
+        toast({
+          title: "No tracks found",
+          description: "Try switching to 'Similar Songs' mode to find more matches.",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       console.error("Error searching for tracks:", error)
       toast({
@@ -152,7 +180,7 @@ export default function ReviewMatchesPage() {
         <div className="mb-6">
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
                 <div className="space-y-1">
                   <Label htmlFor="tracksPerSearch">Tracks per search</Label>
                   <Select 
@@ -170,7 +198,37 @@ export default function ReviewMatchesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleRetrySearch} variant="outline">
+                
+                <div className="space-y-1">
+                  <Label htmlFor="searchMode">Search mode</Label>
+                  <Select 
+                    value={searchMode} 
+                    onValueChange={(value: 'exact' | 'similar') => {
+                      setSearchMode(value);
+                      // Re-run search with new mode
+                      const trackList = localStorage.getItem("trackList") || "";
+                      const trackLines = trackList.split("\n").filter((line) => line.trim());
+                      if (trackLines.length > 0) {
+                        searchForTracks(trackLines);
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="searchMode" className="w-[180px]">
+                      <SelectValue placeholder="Select search mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exact">Exact matches</SelectItem>
+                      <SelectItem value="similar">Similar songs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {searchMode === 'exact' 
+                      ? 'Shows only the closest match for each song' 
+                      : 'Shows multiple similar songs for each search'}
+                  </p>
+                </div>
+                
+                <Button onClick={handleRetrySearch} variant="outline" className="md:self-end">
                   Refresh Results
                 </Button>
               </div>
@@ -198,12 +256,35 @@ export default function ReviewMatchesPage() {
               {tracks.length > 0 ? (
                 tracks.map((track) => <TrackItem key={track.id} track={track} onRemove={handleRemoveTrack} />)
               ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-8 space-y-4">
                   <p className="text-muted-foreground">
                     {isUserAuthenticated
-                      ? "No tracks found. Please go back and try again."
+                      ? "No tracks found. This could be due to formatting issues or Spotify not recognizing the songs."
                       : "Please connect to Spotify to search for tracks."}
                   </p>
+                  
+                  {isUserAuthenticated && (
+                    <>
+                      <div className="p-4 rounded-md bg-amber-50 dark:bg-amber-900/20 text-sm space-y-2">
+                        <p className="font-medium text-amber-800 dark:text-amber-300">Troubleshooting tips:</p>
+                        <ul className="list-disc pl-5 text-amber-700 dark:text-amber-400">
+                          <li>Make sure your songs are in "Song Title - Artist Name" format</li>
+                          <li>Try removing any special characters or descriptions</li>
+                          <li>Check if the artists and songs are available on Spotify</li>
+                          <li>Try searching for just the song title without the artist</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 mt-4">
+                        <Button variant="outline" onClick={() => router.push("/create")} className="w-full">
+                          Go Back and Edit Tracks
+                        </Button>
+                        <Button variant="outline" onClick={handleRetrySearch} className="w-full">
+                          Retry Search with Different Settings
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

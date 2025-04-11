@@ -8,7 +8,11 @@ export function isAuthenticated(): boolean {
 }
 
 // Search for tracks on Spotify
-export async function searchTracks(query: string, limit: number = 5): Promise<Track[]> {
+export async function searchTracks(
+  query: string, 
+  limit: number = 5, 
+  exactMode: boolean = false
+): Promise<Track[]> {
   const accessToken = await getValidAccessToken()
 
   if (!accessToken) {
@@ -16,7 +20,9 @@ export async function searchTracks(query: string, limit: number = 5): Promise<Tr
   }
 
   try {
-    const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&token=${accessToken}&limit=${limit}`)
+    // Add exactMode to the API query parameters
+    const url = `/api/spotify/search?q=${encodeURIComponent(query)}&token=${accessToken}&limit=${limit}&exact=${exactMode ? 'true' : 'false'}`
+    const response = await fetch(url)
 
     if (!response.ok) {
       throw new Error(`Search failed: ${response.statusText}`)
